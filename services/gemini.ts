@@ -20,7 +20,7 @@ export interface NewsItem {
 
 export const getLiveMarketData = async (tickers: string[]): Promise<LiveMarketData[]> => {
   if (tickers.length === 0) return [];
-  const prompt = `Aja como um terminal Bloomberg. Busque o preço atual e variação percentual hoje para: ${tickers.join(", ")}. Retorne APENAS um JSON array.`;
+  const prompt = `Busque via Google Search o preço atual e variação percentual hoje (preço em tempo real) para os ativos: ${tickers.join(", ")}. Retorne APENAS um JSON array.`;
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -50,7 +50,7 @@ export const getLiveMarketData = async (tickers: string[]): Promise<LiveMarketDa
 
 export const getMarketNews = async (tickers: string[]): Promise<NewsItem[]> => {
   if (tickers.length === 0) return [];
-  const prompt = `Busque notícias reais das últimas 48h para os ativos: ${tickers.join(", ")}. Retorne um JSON array com os campos: date (YYYY-MM-DD), ticker, title, summary, source.`;
+  const prompt = `Busque notícias financeiras REAIS das últimas 48h para: ${tickers.join(", ")}. Ordene por data decrescente. Retorne um JSON array com campos: date (YYYY-MM-DD), ticker, title, summary, source.`;
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
@@ -81,10 +81,9 @@ export const getMarketNews = async (tickers: string[]): Promise<NewsItem[]> => {
 
 export const getDividendCalendar = async (tickers: string[]): Promise<DividendProjection[]> => {
   if (tickers.length === 0) return [];
-  // Prompt focado exclusivamente na DATA DE PAGAMENTO para evitar duplicidade com datas de anúncio
-  const prompt = `Verifique no Google a DATA DE PAGAMENTO de dividendos ou JCP prevista ou confirmada para este mês corrente para os seguintes ativos: ${tickers.join(", ")}. 
-  Ignore datas de anúncio (Data-Com). Retorne apenas um registro de PAGAMENTO por ticker. Se não houver pagamento este mês, ignore o ticker.
-  Retorne um JSON array.`;
+  const prompt = `Aja como um analista de RI. Verifique a DATA DE PAGAMENTO (não a data-com) de proventos para este mês atual para: ${tickers.join(", ")}. 
+  IMPORTANTE: Retorne APENAS um registro por ativo se houver pagamento confirmado ou previsto para este mês. 
+  Retorne um JSON array. Se não houver pagamento este mês, ignore o ativo.`;
   
   try {
     const response = await ai.models.generateContent({
@@ -99,10 +98,10 @@ export const getDividendCalendar = async (tickers: string[]): Promise<DividendPr
             type: Type.OBJECT,
             properties: {
               ticker: { type: Type.STRING },
-              day: { type: Type.INTEGER, description: "O dia do mês em que o dinheiro cai na conta" },
-              amount: { type: Type.NUMBER, description: "Valor bruto por cada cota" },
-              type: { type: Type.STRING, description: "Dividendos ou JCP" },
-              status: { type: Type.STRING, description: "previsto ou confirmado" }
+              day: { type: Type.INTEGER },
+              amount: { type: Type.NUMBER },
+              type: { type: Type.STRING },
+              status: { type: Type.STRING }
             }
           }
         }
@@ -115,28 +114,16 @@ export const getDividendCalendar = async (tickers: string[]): Promise<DividendPr
 };
 
 export const getTaxAdvice = async (summary: AssetSummary[]): Promise<string> => {
-  if (summary.length === 0) return "Nenhum ativo na carteira para processar.";
-  
-  const assetsStr = summary.map(a => 
-    `- ${a.ticker} (${a.assetType}): Qtd ${a.totalQuantity}, Preço Médio R$ ${a.averagePrice.toFixed(2)}, Custo Total R$ ${a.totalInvested.toFixed(2)}`
-  ).join('\n');
-
-  const prompt = `Aja como um contador brasileiro especialista em IRPF. 
-Com os ativos abaixo, escreva a discriminação para a ficha de "Bens e Direitos" da Declaração de Ajuste Anual.
-Siga o padrão: "[Ticker] - [Quantidade] cotas de [Tipo] adquiridas pelo custo médio de R$ [Preço Médio]. Valor Total em 31/12: R$ [Total]".
-Dê também uma breve dica sobre qual código usar (ex: 31 para Ações, 73 para FIIs).
-
-Ativos da Carteira:
-${assetsStr}`;
-
+  if (summary.length === 0) return "Adicione ativos na carteira.";
+  const assetsStr = summary.map(a => `${a.ticker}: ${a.totalQuantity} un, PM R$ ${a.averagePrice.toFixed(2)}`).join(', ');
+  const prompt = `Aja como contador brasileiro. Para os ativos [${assetsStr}], escreva a discriminação para a ficha de Bens e Direitos do IRPF. Use o código correto de cada ativo (Ações 31, FIIs 73, etc).`;
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
     });
-    return response.text || "Desculpe, não consegui consolidar as informações do relatório.";
+    return response.text || "";
   } catch (error) {
-    console.error("Gemini API Error (Tax Advice):", error);
-    return "Ocorreu um erro ao gerar o relatório inteligente de imposto de renda.";
+    return "Erro ao gerar relatório.";
   }
 };
