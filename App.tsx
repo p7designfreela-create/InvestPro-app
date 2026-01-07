@@ -17,7 +17,7 @@ import { Transaction, AssetSummary, TransactionType, DividendProjection } from '
 import Dashboard from './components/Dashboard';
 import { getDividendCalendar, getLiveMarketData, LiveMarketData } from './services/gemini';
 
-// Lazy loading components to optimize bundle size and solve Vercel/Vite chunk warnings
+// Lazy loading components to optimize bundle size
 const Transactions = lazy(() => import('./components/Transactions'));
 const Market = lazy(() => import('./components/Market'));
 const TaxReport = lazy(() => import('./components/TaxReport'));
@@ -36,11 +36,20 @@ const App: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string>('--:--');
 
+  // Inicialização e recuperação de dados
   useEffect(() => {
-    const saved = localStorage.getItem('investpro-theme') as Theme;
-    if (saved) setTheme(saved);
+    const savedTheme = localStorage.getItem('investpro-theme') as Theme;
+    if (savedTheme) setTheme(savedTheme);
+    
     const savedTx = localStorage.getItem('investpro-tx');
-    if (savedTx) setTransactions(JSON.parse(savedTx));
+    if (savedTx) {
+      const parsedTx = JSON.parse(savedTx);
+      setTransactions(parsedTx);
+      // Auto-refresh se houver transações salvas
+      if (parsedTx.length > 0) {
+        setTimeout(() => handleRefreshAll(parsedTx), 500);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -48,22 +57,28 @@ const App: React.FC = () => {
     localStorage.setItem('investpro-tx', JSON.stringify(transactions));
   }, [theme, transactions]);
 
-  const handleRefreshAll = async () => {
-    if (isRefreshing) return;
+  const handleRefreshAll = async (currentTxs = transactions) => {
+    if (isRefreshing || currentTxs.length === 0) return;
     setIsRefreshing(true);
-    const tickers: string[] = Array.from(new Set(transactions.map(t => t.ticker)));
+    
+    const tickers: string[] = Array.from(new Set(currentTxs.map(t => t.ticker)));
+    
     try {
       const [livePrices, divData] = await Promise.all([
         getLiveMarketData(tickers),
         getDividendCalendar(tickers)
       ]);
+      
       const priceMap: Record<string, LiveMarketData> = {};
-      livePrices.forEach(p => priceMap[p.ticker] = p);
+      livePrices.forEach(p => {
+        if (p && p.ticker) priceMap[p.ticker] = p;
+      });
+      
       setMarketPrices(priceMap);
-      setProjections(divData);
-      setLastUpdate(new Date().toLocaleTimeString());
+      setProjections(divData || []);
+      setLastUpdate(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
     } catch (err) {
-      console.error(err);
+      console.error("Falha na atualização global:", err);
     } finally {
       setIsRefreshing(false);
     }
@@ -105,6 +120,7 @@ const App: React.FC = () => {
   const summary = useMemo(() => {
     const map = new Map<string, AssetSummary>();
     const sorted = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
     sorted.forEach(tx => {
       const existing = map.get(tx.ticker);
       if (!existing) {
@@ -138,6 +154,7 @@ const App: React.FC = () => {
         }
       }
     });
+
     return Array.from(map.values())
       .filter(a => a.totalQuantity > 0)
       .map(a => ({
@@ -172,17 +189,18 @@ const App: React.FC = () => {
 
         <div className="flex items-center gap-4">
           <button 
-            onClick={handleRefreshAll}
-            disabled={isRefreshing}
+            onClick={() => handleRefreshAll()}
+            disabled={isRefreshing || transactions.length === 0}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all border
-            ${theme === 'light' ? 'bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-100' : 'bg-slate-800 text-slate-100 border-slate-700'}`}>
+            ${theme === 'light' ? 'bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-100' : 'bg-slate-800 text-slate-100 border-slate-700'}
+            disabled:opacity-40 disabled:cursor-not-allowed`}>
             <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
-            <span className="hidden sm:inline">{isRefreshing ? 'Sincronizando' : 'Atualizar'}</span>
+            <span className="hidden sm:inline">{isRefreshing ? 'Sincronizando' : 'Sincronizar'}</span>
           </button>
           <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-             <button onClick={() => setTheme('light')} className={`p-1.5 rounded-lg transition-all ${theme === 'light' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}><Sun size={16}/></button>
-             <button onClick={() => setTheme('dark')} className={`p-1.5 rounded-lg transition-all ${theme === 'dark' ? 'bg-slate-700 text-blue-400' : 'text-slate-400'}`}><Moon size={16}/></button>
-             <button onClick={() => setTheme('neon')} className={`p-1.5 rounded-lg transition-all ${theme === 'neon' ? 'bg-cyan-500 text-black' : 'text-slate-400'}`}><Zap size={16}/></button>
+             <button onClick={() => setTheme('light')} className={`p-1.5 rounded-lg transition-all ${theme === 'light' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`} title="Modo Claro"><Sun size={16}/></button>
+             <button onClick={() => setTheme('dark')} className={`p-1.5 rounded-lg transition-all ${theme === 'dark' ? 'bg-slate-700 text-blue-400' : 'text-slate-400'}`} title="Modo Escuro"><Moon size={16}/></button>
+             <button onClick={() => setTheme('neon')} className={`p-1.5 rounded-lg transition-all ${theme === 'neon' ? 'bg-cyan-500 text-black' : 'text-slate-400'}`} title="Modo Neon"><Zap size={16}/></button>
           </div>
         </div>
       </header>
@@ -191,11 +209,11 @@ const App: React.FC = () => {
         <Suspense fallback={
           <div className="h-96 flex flex-col items-center justify-center gap-4 opacity-30">
             <Loader2 className="animate-spin text-indigo-600" size={32} />
-            <p className="text-[10px] font-black uppercase tracking-widest">Carregando Módulo...</p>
+            <p className="text-[10px] font-black uppercase tracking-widest">Acessando Terminal...</p>
           </div>
         }>
           {activeTab === 'market' && <Dashboard summary={summary} theme={theme} projections={projections} lastUpdate={lastUpdate} />}
-          {activeTab === 'transactions' && <Transactions transactions={transactions} onAdd={(tx) => setTransactions(p => [...p, tx])} onDelete={(id) => setTransactions(p => p.filter(t => t.id !== id))} theme={theme} />}
+          {activeTab === 'transactions' && <Transactions transactions={transactions} onAdd={(tx) => { setTransactions(p => [...p, tx]); handleRefreshAll([...transactions, tx]); }} onDelete={(id) => setTransactions(p => p.filter(t => t.id !== id))} theme={theme} />}
           {activeTab === 'graphs' && <Graphs summary={summary} projections={projections} theme={theme} />}
           {activeTab === 'news' && <News tickers={summary.map(s => s.ticker)} />}
           {activeTab === 'tax' && <TaxReport summary={summary} />}
