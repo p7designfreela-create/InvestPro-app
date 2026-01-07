@@ -1,0 +1,7 @@
+{
+  "name": "InvestPro Terminal Inteligente",
+  "description": "Uma plataforma premium para gestão de investimentos e cálculo automático de Imposto de Renda (IRPF). Inclui monitoramento em tempo real, relatórios 'copia e cola' para a Receita Federal, gráficos de rentabilidade e calendário de proventos.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
