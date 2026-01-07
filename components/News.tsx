@@ -22,7 +22,6 @@ const News: React.FC<NewsProps> = ({ tickers }) => {
     fetchNews();
   }, [tickers.join(',')]);
 
-  // Ordenação descendente (mais recentes primeiro)
   const sortedNews = [...news].sort((a, b) => {
     const dateA = new Date(a.date || '').getTime();
     const dateB = new Date(b.date || '').getTime();
@@ -31,13 +30,13 @@ const News: React.FC<NewsProps> = ({ tickers }) => {
 
   return (
     <div className="max-w-full space-y-8 animate-in slide-in-from-right duration-700">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-2">
         <div>
           <h2 className="text-3xl font-black tracking-tight flex items-center gap-3">
             <Newspaper className="text-indigo-600" size={28} />
-            Feed de Notícias
+            Terminal de Notícias
           </h2>
-          <p className="text-sm opacity-50 font-medium">Atualizações em tempo real dos seus ativos.</p>
+          <p className="text-sm opacity-50 font-medium">Fatos relevantes e atualizações dos seus ativos.</p>
         </div>
         <div className="flex items-center gap-4">
           <div className="hidden md:flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest opacity-40">
@@ -60,28 +59,28 @@ const News: React.FC<NewsProps> = ({ tickers }) => {
       ) : news.length === 0 ? (
         <div className="py-32 text-center opacity-30">
           <FolderOpen size={64} className="mx-auto text-indigo-200" />
-          <p className="text-sm font-bold uppercase tracking-widest mt-4">Nenhuma notícia relevante encontrada</p>
+          <p className="text-sm font-bold uppercase tracking-widest mt-4">Nenhum fato relevante hoje</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
           {sortedNews.map((item, i) => (
-            <div key={i} className="group flex flex-col p-6 bg-white dark:bg-[#0F172A] border border-slate-100 dark:border-slate-800 rounded-[2rem] shadow-sm hover:shadow-2xl hover:border-indigo-500/30 transition-all hover:-translate-y-2 h-full">
+            <div key={i} className="group flex flex-col p-7 bg-white dark:bg-[#0F172A] border border-slate-100 dark:border-slate-800 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:border-indigo-500/40 transition-all hover:-translate-y-2 h-[320px]">
               <div className="flex justify-between items-start mb-4">
-                <span className="px-3 py-1 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase">
+                <span className="px-3 py-1 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-tighter">
                   {item.ticker}
                 </span>
-                <span className="text-[10px] opacity-40 font-bold">{item.date}</span>
+                <span className="text-[10px] opacity-40 font-bold font-mono-tech">{item.date}</span>
               </div>
-              <h3 className="font-extrabold text-[14px] leading-tight mb-3 group-hover:text-indigo-600 transition-colors line-clamp-2">
+              <h3 className="font-extrabold text-[15px] leading-snug mb-3 group-hover:text-indigo-600 transition-colors line-clamp-2">
                 {item.title}
               </h3>
               <p className="text-xs opacity-50 leading-relaxed line-clamp-4 flex-1 mb-4 font-medium">
                 {item.summary}
               </p>
-              <div className="pt-4 border-t border-slate-500/5 flex justify-between items-center">
-                 <span className="text-[9px] font-bold opacity-30 uppercase">{item.source}</span>
-                 <button className="text-[9px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1">
-                   LER <ExternalLink size={10} />
+              <div className="pt-5 border-t border-slate-500/5 dark:border-slate-500/10 flex justify-between items-center">
+                 <span className="text-[10px] font-black opacity-30 uppercase tracking-widest">{item.source}</span>
+                 <button className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2 group-hover:gap-3 transition-all">
+                   LER MAIS <ExternalLink size={12} />
                  </button>
               </div>
             </div>
