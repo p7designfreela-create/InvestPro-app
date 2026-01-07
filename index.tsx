@@ -1,7 +1,7 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App.tsx'; // Adicionada a extensão .tsx para facilitar a resolução no build da Vercel
+import App from './App'; // Vite resolve extensões .tsx automaticamente
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

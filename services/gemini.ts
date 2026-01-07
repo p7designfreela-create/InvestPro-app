@@ -2,7 +2,11 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Transaction, AssetSummary, DividendProjection } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Função para obter a instância do AI de forma segura para o build/runtime
+const getAI = () => {
+  const apiKey = typeof process !== 'undefined' ? process.env.API_KEY : '';
+  return new GoogleGenAI({ apiKey: apiKey || '' });
+};
 
 export interface LiveMarketData {
   ticker: string;
@@ -20,6 +24,7 @@ export interface NewsItem {
 
 export const getLiveMarketData = async (tickers: string[]): Promise<LiveMarketData[]> => {
   if (tickers.length === 0) return [];
+  const ai = getAI();
   const prompt = `Busque via Google Search o preço atual e variação percentual hoje (preço em tempo real) para os ativos: ${tickers.join(", ")}. Retorne APENAS um JSON array.`;
   try {
     const response = await ai.models.generateContent({
@@ -44,12 +49,14 @@ export const getLiveMarketData = async (tickers: string[]): Promise<LiveMarketDa
     });
     return JSON.parse(response.text || "[]");
   } catch (error) {
+    console.error("Erro ao buscar dados de mercado:", error);
     return [];
   }
 };
 
 export const getMarketNews = async (tickers: string[]): Promise<NewsItem[]> => {
   if (tickers.length === 0) return [];
+  const ai = getAI();
   const prompt = `Busque notícias financeiras REAIS das últimas 48h para: ${tickers.join(", ")}. Ordene por data decrescente. Retorne um JSON array com campos: date (YYYY-MM-DD), ticker, title, summary, source.`;
   try {
     const response = await ai.models.generateContent({
@@ -75,12 +82,14 @@ export const getMarketNews = async (tickers: string[]): Promise<NewsItem[]> => {
     });
     return JSON.parse(response.text || "[]");
   } catch (error) {
+    console.error("Erro ao buscar notícias:", error);
     return [];
   }
 };
 
 export const getDividendCalendar = async (tickers: string[]): Promise<DividendProjection[]> => {
   if (tickers.length === 0) return [];
+  const ai = getAI();
   const prompt = `Aja como um analista de RI. Verifique a DATA DE PAGAMENTO (não a data-com) de proventos para este mês atual para: ${tickers.join(", ")}. 
   IMPORTANTE: Retorne APENAS um registro por ativo se houver pagamento confirmado ou previsto para este mês. 
   Retorne um JSON array. Se não houver pagamento este mês, ignore o ativo.`;
@@ -109,12 +118,14 @@ export const getDividendCalendar = async (tickers: string[]): Promise<DividendPr
     });
     return JSON.parse(response.text || "[]");
   } catch (error) {
+    console.error("Erro ao buscar calendário:", error);
     return [];
   }
 };
 
 export const getTaxAdvice = async (summary: AssetSummary[]): Promise<string> => {
   if (summary.length === 0) return "Adicione ativos na carteira.";
+  const ai = getAI();
   const assetsStr = summary.map(a => `${a.ticker}: ${a.totalQuantity} un, PM R$ ${a.averagePrice.toFixed(2)}`).join(', ');
   const prompt = `Aja como contador brasileiro. Para os ativos [${assetsStr}], escreva a discriminação para a ficha de Bens e Direitos do IRPF. Use o código correto de cada ativo (Ações 31, FIIs 73, etc).`;
   try {
@@ -124,6 +135,7 @@ export const getTaxAdvice = async (summary: AssetSummary[]): Promise<string> => 
     });
     return response.text || "";
   } catch (error) {
+    console.error("Erro ao gerar conselho fiscal:", error);
     return "Erro ao gerar relatório.";
   }
 };
