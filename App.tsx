@@ -11,13 +11,15 @@ import {
   Zap,
   X,
   PieChart,
-  Loader2
+  Loader2,
+  Wifi,
+  WifiOff,
+  CheckCircle
 } from 'lucide-react';
 import { Transaction, AssetSummary, TransactionType, DividendProjection } from './types';
 import Dashboard from './components/Dashboard';
 import { getDividendCalendar, getLiveMarketData, LiveMarketData } from './services/gemini';
 
-// Lazy loading components to optimize bundle size
 const Transactions = lazy(() => import('./components/Transactions'));
 const Market = lazy(() => import('./components/Market'));
 const TaxReport = lazy(() => import('./components/TaxReport'));
@@ -35,8 +37,9 @@ const App: React.FC = () => {
   const [marketPrices, setMarketPrices] = useState<Record<string, LiveMarketData>>({});
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string>('--:--');
+  const [apiStatus, setApiStatus] = useState<'online' | 'offline' | 'checking'>('checking');
+  const [showSuccess, setShowSuccess] = useState(false);
 
-  // Inicialização e recuperação de dados
   useEffect(() => {
     const savedTheme = localStorage.getItem('investpro-theme') as Theme;
     if (savedTheme) setTheme(savedTheme);
@@ -45,10 +48,13 @@ const App: React.FC = () => {
     if (savedTx) {
       const parsedTx = JSON.parse(savedTx);
       setTransactions(parsedTx);
-      // Auto-refresh se houver transações salvas
       if (parsedTx.length > 0) {
-        setTimeout(() => handleRefreshAll(parsedTx), 500);
+        handleRefreshAll(parsedTx);
+      } else {
+        setApiStatus('online'); // Assume online se não tem o que buscar
       }
+    } else {
+      setApiStatus('online');
     }
   }, []);
 
@@ -60,6 +66,7 @@ const App: React.FC = () => {
   const handleRefreshAll = async (currentTxs = transactions) => {
     if (isRefreshing || currentTxs.length === 0) return;
     setIsRefreshing(true);
+    setApiStatus('checking');
     
     const tickers: string[] = Array.from(new Set(currentTxs.map(t => t.ticker)));
     
@@ -77,8 +84,12 @@ const App: React.FC = () => {
       setMarketPrices(priceMap);
       setProjections(divData || []);
       setLastUpdate(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
-    } catch (err) {
-      console.error("Falha na atualização global:", err);
+      setApiStatus('online');
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+    } catch (err: any) {
+      console.error("Falha na sincronização:", err);
+      setApiStatus('offline');
     } finally {
       setIsRefreshing(false);
     }
@@ -167,15 +178,25 @@ const App: React.FC = () => {
   return (
     <div className={`min-h-screen flex flex-col transition-all duration-300 ${themeClasses.bg} ${themeClasses.text}`}>
       <header className={`px-4 lg:px-12 py-4 flex items-center justify-between sticky top-0 z-50 ${themeClasses.header} glass-effect`}>
-        <div className="flex items-center gap-3">
-          <div className="bg-indigo-600 p-2 rounded-xl shadow-lg shadow-indigo-600/20">
-             <TrendingUp className="text-white" size={20} />
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3">
+            <div className="bg-indigo-600 p-2 rounded-xl shadow-lg shadow-indigo-600/20">
+               <TrendingUp className="text-white" size={20} />
+            </div>
+            <div>
+              <h1 className="text-lg font-black tracking-tight">
+                <span className={theme === 'light' ? 'text-slate-900' : 'text-white'}>Invest</span><span className="text-indigo-500">Pro</span>
+              </h1>
+              <p className={`text-[10px] font-bold uppercase tracking-widest ${themeClasses.textMuted}`}>Terminal Premium</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-black tracking-tight">
-              <span className={theme === 'light' ? 'text-slate-900' : 'text-white'}>Invest</span><span className="text-indigo-500">Pro</span>
-            </h1>
-            <p className={`text-[10px] font-bold uppercase tracking-widest ${themeClasses.textMuted}`}>Terminal Premium</p>
+          
+          <div className={`hidden md:flex items-center gap-2 px-3 py-1 rounded-full border text-[9px] font-black uppercase tracking-widest
+            ${apiStatus === 'online' ? 'border-emerald-500/20 text-emerald-500 bg-emerald-500/5' : 
+              apiStatus === 'offline' ? 'border-rose-500/20 text-rose-500 bg-rose-500/5' : 
+              'border-slate-500/20 text-slate-500 animate-pulse'}`}>
+            {apiStatus === 'online' ? <Wifi size={10} /> : <WifiOff size={10} />}
+            {apiStatus === 'online' ? 'Terminal Conectado' : apiStatus === 'offline' ? 'Erro de API' : 'Sincronizando...'}
           </div>
         </div>
 
@@ -192,10 +213,11 @@ const App: React.FC = () => {
             onClick={() => handleRefreshAll()}
             disabled={isRefreshing || transactions.length === 0}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all border
-            ${theme === 'light' ? 'bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-100' : 'bg-slate-800 text-slate-100 border-slate-700'}
+            ${showSuccess ? 'bg-emerald-500 text-white border-emerald-400' :
+              theme === 'light' ? 'bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-100' : 'bg-slate-800 text-slate-100 border-slate-700'}
             disabled:opacity-40 disabled:cursor-not-allowed`}>
-            <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
-            <span className="hidden sm:inline">{isRefreshing ? 'Sincronizando' : 'Sincronizar'}</span>
+            {showSuccess ? <CheckCircle size={16} /> : <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />}
+            <span className="hidden sm:inline">{isRefreshing ? 'Sincronizando' : showSuccess ? 'Atualizado' : 'Sincronizar'}</span>
           </button>
           <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
              <button onClick={() => setTheme('light')} className={`p-1.5 rounded-lg transition-all ${theme === 'light' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`} title="Modo Claro"><Sun size={16}/></button>
@@ -206,6 +228,16 @@ const App: React.FC = () => {
       </header>
 
       <main className={`flex-1 p-4 lg:p-12 max-w-[1600px] mx-auto w-full`}>
+        {apiStatus === 'offline' && (
+          <div className="mb-8 p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-center justify-between">
+            <div className="flex items-center gap-3 text-rose-600 text-sm font-bold">
+              <WifiOff size={18} />
+              Atenção: Terminal offline. Configure sua API_KEY no painel da Vercel para habilitar cotações em tempo real.
+            </div>
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-[10px] font-black uppercase bg-rose-600 text-white px-3 py-1.5 rounded-lg hover:bg-rose-700 transition-all">Obter Chave</a>
+          </div>
+        )}
+
         <Suspense fallback={
           <div className="h-96 flex flex-col items-center justify-center gap-4 opacity-30">
             <Loader2 className="animate-spin text-indigo-600" size={32} />
